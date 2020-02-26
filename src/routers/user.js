@@ -1,6 +1,7 @@
 const express = require('express')
 const User = require('../models/user')
 const auth = require('../middleware/auth')
+const { sendWelcomeEmail, sendGoodByeEmail } = require('../emails/account')
 const multer = require('multer')
 const sharp = require('sharp')
 const router = new express.Router()
@@ -11,8 +12,12 @@ router.post('/users', async (req, res) => {
     const user = new User(req.body)
     
     try {
-        const token = await user.generateAuthToken()
         await user.save()
+        
+        // sending welcome email (await should not be used here)
+        sendWelcomeEmail(user.email, user.name)
+        
+        const token = await user.generateAuthToken()
         res.status(201).send({user, token})
     } catch(e) {
         res.status(400).send(e)
@@ -73,6 +78,7 @@ router.patch('/users/me', auth, async (req, res) => {
 
 router.delete('/users/me', auth, async (req, res) => {
     try {
+        sendGoodByeEmail(req.user.email, req.user.name)
         await req.user.remove()
         res.send(req.user)
     } catch(e) {
@@ -118,8 +124,8 @@ router.get('/users/:id/avatar', async (req, res) => {
         }
         res.set('Content-Type', 'image/png')
         res.send(user.avatar)
-    } catch {
-        res.status(404).send
+    } catch (e) {
+        res.status(404).send()
     }
      
 })
