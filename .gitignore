@@ -1,4 +1,4 @@
-sendgrid.env
+**/*.DS_Store
 node_modules
 config
 playground
