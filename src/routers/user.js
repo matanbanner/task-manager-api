@@ -114,6 +114,14 @@ router.delete('/users/me/avatar', auth, async (req, res) => {
     res.send()
 })
 
+router.get('/users/me/avatar', auth, async (req, res) => {
+    if (!req.user.avatar) {
+        return res.status(404).send()
+    }
+    res.set('Content-Type', 'image/png')
+    res.send(req.user.avatar)
+})
+
 router.get('/users/:id/avatar', async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
