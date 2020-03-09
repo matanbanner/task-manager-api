@@ -19,4 +19,14 @@ const auth = async (req, res, next) => {
     }
 }
 
-module.exports = auth
+const adminAuth = async (req, res, next) => {
+    if (!req.user.admin) {
+        return res.status(401).send('Missing permission')
+    }
+    next()
+}
+
+module.exports = {
+    auth,
+    adminAuth
+}

@@ -1,6 +1,6 @@
 const express = require('express')
 const User = require('../models/user')
-const auth = require('../middleware/auth')
+const { auth, adminAuth} = require('../middleware/auth')
 const { sendWelcomeEmail, sendGoodByeEmail } = require('../emails/account')
 const multer = require('multer')
 const sharp = require('sharp')
@@ -9,6 +9,11 @@ const router = new express.Router()
 
 
 router.post('/users', async (req, res) => {
+    const attributes = Object.keys(req.body)
+    
+    if (!validateAttributes(attributes)) {
+        return res.status(400).send({error: 'Invalid attributes!'})
+    }
     const user = new User(req.body)
     
     try {
@@ -60,10 +65,8 @@ router.get('/users/me', auth, async (req, res) => {
 
 router.patch('/users/me', auth, async (req, res) => {
     const updates = Object.keys(req.body)
-    const allowedUpdates = ['name', 'email', 'password', 'age']
-    const isValidation = updates.every(update => allowedUpdates.includes(update))
     
-    if (!isValidation) {
+    if (!validateAttributes(updates)) {
         return res.status(400).send({error: 'Invalid updates!'})
     }
     
@@ -122,13 +125,56 @@ router.get('/users/me/avatar', auth, async (req, res) => {
     res.send(req.user.avatar)
 })
 
-router.get('/users/:id/avatar', async (req, res) => {
+
+
+
+// The following endpoints require admin permission
+
+
+
+// GET /users?admin=true
+// GET /users?limit=10&skip=20
+// GET /users?sortBy=CreatedAt:desc
+router.get('/users', auth, adminAuth, async (req, res) => {
+    
+    const limit = parseInt(req.query.limit)
+    const skip = parseInt(req.query.skip)
+    const admin = req.query.admin
+    const sortArgs = {}
+    
+    if (req.query.sortBy) {
+        const parts = req.query.sortBy.split(':')
+        sortArgs[parts[0]] = parts[1] === 'desc' ? -1 : 1
+    }
+
+    try {
+        const users = await User.find({admin}, null, {skip, limit}).sort(sortArgs)
+        res.send(users)
+    } catch(e) {        
+        res.status(500).send()
+    }
+})
+
+router.delete('/users/:id', auth, adminAuth, async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
-        console.log(user)
+        if (!user) {
+            return res.status(404).send()
+        }
+        sendGoodByeEmail(user.email, user.name)
+        await user.remove()
+        res.send(user)
+    } catch(e) {
+        res.status(500).send()
+    }
+})
+
+
+router.get('/users/:id/avatar', auth, adminAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id)
         if (!user || !user.avatar) {
             throw new Error()
-    
         }
         res.set('Content-Type', 'image/png')
         res.send(user.avatar)
@@ -137,6 +183,13 @@ router.get('/users/:id/avatar', async (req, res) => {
     }
      
 })
+
+
+
+const validateAttributes = (attributes) => {
+    const allowedAttributes = ['name', 'email', 'password', 'age']
+    return attributes.every(attr => allowedAttributes.includes(attr))
+}
 
 
 module.exports = router

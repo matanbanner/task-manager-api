@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken')
 const Task = require('./task')
 
 const userSchema = new mongoose.Schema({
+    admin: {
+        type: Boolean
+    },
     name: {
         type: String,
         required: true
